@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
 <style>
 
   :root{
@@ -685,12 +686,12 @@
         </div>
         <div class="calendly-wrap">
           <iframe
-            src="https://calendly.com/sahran-srv/ai-automation-demo?hide_gdpr_banner=1&background_color=f5f5ed&text_color=111111&primary_color=1b4d2e"
+            src="https://calendly.com/sahran-creativeworksai/30min?hide_gdpr_banner=1&background_color=f5f5ed&text_color=111111&primary_color=1b4d2e"
             title="Book a demo with CreativeWorks AI">
           </iframe>
         </div>
         <div class="calendly-fallback">
-          Calendar not loading? <a href="https://calendly.com/sahran-srv/ai-automation-demo" target="_blank" rel="noopener">Open the booking page directly →</a>
+          Calendar not loading? <a href="https://calendly.com/sahran-creativeworksai/30min" target="_blank" rel="noopener">Open the booking page directly →</a>
         </div>
       </div>
     </div>
@@ -741,6 +742,145 @@
       toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
     });
   });
+</script>
+
+<!-- ChatKit floating booking assistant -->
+<div id="chat-tooltip" style="
+  position: fixed; bottom: 32px; right: 92px; z-index: 9999;
+  background: #111111; color: #F5F5ED; padding: 11px 16px; border-radius: 10px;
+  font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 600;
+  box-shadow: 0 10px 28px rgba(17,17,17,0.3); white-space: nowrap;
+  display: flex; align-items: center; gap: 10px;
+  animation: tooltip-in .4s ease-out, tooltip-float 2.6s ease-in-out 1s infinite;
+">
+  <span>Need to book? Chat with me →</span>
+  <button id="chat-tooltip-close" aria-label="Dismiss" style="
+    background: none; border: none; color: rgba(245,245,237,0.5); cursor: pointer;
+    font-size: 15px; line-height: 1; padding: 0;
+  ">✕</button>
+  <span style="
+    position:absolute; right:14px; bottom:-6px; width:12px; height:12px;
+    background:#111111; transform: rotate(45deg);
+  "></span>
+</div>
+
+<div id="chat-pulse-ring" style="
+  position: fixed; bottom: 24px; right: 24px; z-index: 9998;
+  width: 58px; height: 58px; border-radius: 50%;
+  animation: pulse-ring 2s ease-out infinite; pointer-events: none;
+"></div>
+
+<button id="chat-toggle" aria-label="Open booking chat" style="
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  width: 58px; height: 58px; border-radius: 50%; border: none;
+  background: #FFD300; color: #111111; cursor: pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size: 24px; box-shadow: 0 8px 24px rgba(17,17,17,0.25);
+  transition: transform .15s ease;
+">💬</button>
+
+<style>
+  @keyframes tooltip-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes tooltip-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(255,211,0,0.55); }
+    70% { box-shadow: 0 0 0 16px rgba(255,211,0,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,211,0,0); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    #chat-tooltip, #chat-pulse-ring { animation: none !important; }
+  }
+</style>
+
+<div id="chat-container" style="
+  display: none; position: fixed; bottom: 94px; right: 24px; z-index: 9998;
+  width: 380px; max-width: calc(100vw - 32px); height: 600px; max-height: calc(100vh - 140px);
+  border-radius: 16px; border: 1px solid rgba(17,17,17,0.12);
+  box-shadow: 0 20px 50px -12px rgba(17,17,17,0.35); overflow: hidden;
+  background: #F5F5ED;
+">
+  <openai-chatkit style="width: 100%; height: 100%;"></openai-chatkit>
+</div>
+
+<script>
+  const chatTooltip = document.getElementById('chat-tooltip');
+  const chatPulseRing = document.getElementById('chat-pulse-ring');
+
+  // Don't nag returning visitors who already dismissed or used the chat
+  if (localStorage.getItem('cw_chat_tooltip_dismissed') === '1') {
+    chatTooltip.style.display = 'none';
+  }
+
+  document.getElementById('chat-tooltip-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    chatTooltip.style.display = 'none';
+    localStorage.setItem('cw_chat_tooltip_dismissed', '1');
+  });
+
+  document.getElementById('chat-toggle').addEventListener('mouseenter', (e) => { e.target.style.transform = 'translateY(-2px)'; });
+  document.getElementById('chat-toggle').addEventListener('mouseleave', (e) => { e.target.style.transform = 'translateY(0)'; });
+  document.getElementById('chat-toggle').addEventListener('click', () => {
+    const container = document.getElementById('chat-container');
+    container.style.display = container.style.display === 'none' ? 'block' : 'none';
+    chatTooltip.style.display = 'none';
+    chatPulseRing.style.display = 'none';
+    localStorage.setItem('cw_chat_tooltip_dismissed', '1');
+  });
+
+  const DOMAIN_KEY = 'domain_pk_6a4eb4b1390081968d09d1c0150d083200c3a12a2fb80ef3';
+  const API_URL = 'https://openai.secondbrainos.com/chatkit';
+
+  const customFetch = (url, options = {}) => {
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'X-Domain-Key': DOMAIN_KEY,
+      },
+    });
+  };
+
+  function initChatKit() {
+    const kit = document.querySelector('openai-chatkit');
+    if (kit && kit.setOptions) {
+      kit.setOptions({
+        api: {
+          url: API_URL,
+          domainKey: DOMAIN_KEY,
+          fetch: customFetch,
+        },
+        theme: {
+          colorScheme: 'light',
+          color: {
+            accent: { primary: '#1B4D2E', level: 2 },
+          },
+          radius: 'round',
+          density: 'spacious',
+        },
+        startScreen: {
+          greeting: 'Hi! I can help you book, reschedule, or cancel appointments. What would you like to do?',
+          prompts: [
+            { label: 'Book an appointment', prompt: 'I want to book an appointment', icon: 'calendar' },
+            { label: 'Check availability', prompt: 'What times are available?', icon: 'clock' },
+            { label: 'Reschedule', prompt: 'I need to reschedule my appointment', icon: 'reload' }
+          ]
+        },
+        composer: {
+          placeholder: 'Ask me about scheduling...'
+        }
+      });
+    } else {
+      setTimeout(initChatKit, 50);
+    }
+  }
+
+  initChatKit();
 </script>
 
 </body>
